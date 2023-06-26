@@ -7,6 +7,10 @@ from dash.dependencies import Input, Output
 from plotly import graph_objects as go
 from sklearn.metrics.pairwise import cosine_similarity
 
+# parameters
+default_similarity_threshold = 20
+point_size = 3
+
 # Creating the sample DataFrame
 data = [
     ["This is the first sample text.", 3.2, 4.5, 6.7, 1],
@@ -28,8 +32,8 @@ similarity_matrix = cosine_similarity(df[['0', '1', '2']])
 n = int(df.shape[0] / 2)
 
 # if n > 20 then n = 20
-if n > 20:
-    n = 20
+if n > default_similarity_threshold:
+    n = default_similarity_threshold
 
 
 # Creating the Dash application
@@ -135,7 +139,7 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
         z=filtered_df['2'],
         mode='markers',
         marker=dict(
-            size=6,
+            size=point_size,
             color=filtered_df['page'],
             colorscale='Viridis',
             opacity=0.8
@@ -204,7 +208,7 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
                         z=[filtered_df.iloc[clicked_index]['2'], filtered_df.iloc[i]['2']],
                         mode='markers',
                         marker=dict(
-                            size=6,
+                            size=point_size,
                             color='red',
                             opacity=0.8
                         ),
