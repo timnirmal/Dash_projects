@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from dash import dcc
 from dash import html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 from plotly import graph_objects as go
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -38,6 +38,7 @@ if n > default_similarity_threshold:
 
 # Creating the Dash application
 app = dash.Dash(__name__)
+
 
 # Defining the layout
 app.layout = html.Div([
@@ -102,6 +103,7 @@ app.layout = html.Div([
             html.Div(id='clicked-point-output')
         ], style={'width': '34%', 'display': 'inline-block', 'vertical-align': 'top', 'margin-left': '15px'}),
 
+        dcc.Store(id='plot-state'),
 
     ])
 ])
@@ -113,9 +115,10 @@ app.layout = html.Div([
      Input('page-input', 'value'),
      Input('scatter-plot', 'clickData'),
      Input('clear-selection-button', 'n_clicks'),
-     Input('similarity-threshold', 'value')]
+     Input('similarity-threshold', 'value')],
+    [State('scatter-plot', 'relayoutData')]
 )
-def update_scatter_plot(show_text, page_number, click_data, clear_selection_clicks, similarity_threshold):
+def update_scatter_plot(show_text, page_number, click_data, clear_selection_clicks, similarity_threshold, scatter_relayout_data):
     # Creating the hover template based on the checkbox value
     hover_template = 'X: %{x}<br>Y: %{y}<br>Z: %{z}<br>'
 
@@ -131,6 +134,10 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
     else:
         hover_template += 'Text ID: %{customdata}'
         customdata = filtered_df['text_id']
+
+
+    # Update the hover template
+    hover_template += '<extra></extra>'
 
     # Create the scatter plot
     trace = go.Scatter3d(
@@ -225,6 +232,15 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
         if clear_selection_clicks % 2 == 1:
             fig.data = [fig.data[0]]
 
+    # Update the layout based on the relayout data
+    if scatter_relayout_data is not None:
+        if 'scene.camera' in scatter_relayout_data:
+            fig.update_layout(scene_camera=scatter_relayout_data['scene.camera'])
+
+    # Restore scatter plot zoom and position data
+        if scatter_relayout_data is not None:
+            scatter_relayout_data['autosize'] = True
+
     return fig
 
 
@@ -232,9 +248,10 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
 # Callback function to update the right sidebar output
 @app.callback(
     Output('hovered-point-output', 'children'),
-    [Input('scatter-plot', 'hoverData')]
+    [Input('scatter-plot', 'hoverData')],
+    [State('scatter-plot', 'relayoutData')]
 )
-def update_hovered_point_output(hover_data):
+def update_hovered_point_output(hover_data, scatter_relayout_data):
     if hover_data is not None:
         point_data = hover_data['points'][0]
         x, y, z = point_data['x'], point_data['y'], point_data['z']
@@ -247,6 +264,10 @@ def update_hovered_point_output(hover_data):
             text_value, text_id, page = None, None, None
     else:
         x, y, z, text_value, text_id, page = None, None, None, None, None, None
+
+    # Restore scatter plot zoom and position data
+    if scatter_relayout_data is not None:
+        scatter_relayout_data['autosize'] = True
 
     if x is not None and y is not None and z is not None and text_value is not None:
         return html.Div([
@@ -267,11 +288,12 @@ def update_hovered_point_output(hover_data):
 @app.callback(
     Output('clicked-point-output', 'children'),
     [Input('scatter-plot', 'clickData'),
-     Input('similarity-threshold', 'value')]
+     Input('similarity-threshold', 'value')],
+    [State('scatter-plot', 'relayoutData')]
 )
 # In this function we need to get n number all of most similar texts from and update the clicked point output
 # text_id - text - similarity score
-def update_clicked_point_output(click_data, similarity_threshold):
+def update_clicked_point_output(click_data, similarity_threshold, scatter_relayout_data):
     if click_data is not None:
         clicked_index = click_data['points'][0]['pointNumber']
         print(df)
@@ -310,13 +332,42 @@ def update_clicked_point_output(click_data, similarity_threshold):
             print(similarity_scores[i])
             output.append(html.P(f"{similar_texts.iloc[i]} - {similarity_scores[i]}"))
 
+        # Restore scatter plot zoom and position data
+        if scatter_relayout_data is not None:
+            scatter_relayout_data['autosize'] = True
+            # scatter_relayout_data['uirevision'] = True
+            # scatter_relayout_data['xaxis.autorange'] = False
+            # scatter_relayout_data['yaxis.autorange'] = False
+            # scatter_relayout_data['zaxis.autorange'] = False
+            # scatter_relayout_data['scene.xaxis.range'] = [df['0'].min(), df['0'].max()]
+
+
         return output
 
     else:
         return html.P("Click on a point to see its most similar texts.")
 
 
+# Callback function to update plot state on zoom or pan events
+@app.callback(
+    Output('plot-state', 'data'),
+    [Input('scatter-plot', 'relayoutData')]
+)
+def update_plot_state(relayout_data):
+    return relayout_data
 
+
+# Restoring the plot state after the function is processed
+@app.callback(
+    Output('scatter-plot', 'relayoutData'),
+    [Input('clicked-point-output', 'children')],
+    [State('plot-state', 'data')]  # Retrieve plot state data
+)
+def restore_plot_state(children, plot_state):
+    if plot_state is not None:
+        return plot_state
+    else:
+        return {}
 
 
 # Running the Dash application
