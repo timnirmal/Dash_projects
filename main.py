@@ -1,12 +1,11 @@
-import pandas as pd
-import plotly.express as px
 import dash
+import numpy as np
+import pandas as pd
 from dash import dcc
 from dash import html
-from dash.dependencies import Input, Output, State
+from dash.dependencies import Input, Output
 from plotly import graph_objects as go
 from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
 
 # Creating the sample DataFrame
 data = [
@@ -25,6 +24,13 @@ df['text_id'] = df['page'].astype(str) + '_' + df.groupby('page').cumcount().add
 # Compute cosine similarity matrix
 similarity_matrix = cosine_similarity(df[['0', '1', '2']])
 
+# dataframe max rows / 2
+n = int(df.shape[0] / 2)
+
+# if n > 20 then n = 20
+if n > 20:
+    n = 20
+
 
 # Creating the Dash application
 app = dash.Dash(__name__)
@@ -36,7 +42,7 @@ app.layout = html.Div([
             id='left-sidebar',
             className='sidebar',
             children=[
-                html.H2("Left Sidebar"),
+                # html.H2("Left Sidebar"),
                 html.H4("Tooltip Options"),
                 dcc.Checklist(
                     id='tooltip-toggle',
@@ -56,26 +62,43 @@ app.layout = html.Div([
                     max=df['page'].max(),
                     step=1
                 ),
+                html.Br(),
+                html.H4("Similarity Threshold"),
+                dcc.Input(
+                    id='similarity-threshold',
+                    type='number',
+                    placeholder='Enter similarity threshold',
+                    min=1,
+                    step=1,
+                    value=n
+                ),
+                html.Br(),
+                html.Br(),
+                html.Br(),
+                html.Br(),
+                html.Br(),
+                html.Br(),
+                html.Button('Toggle Selection', id='clear-selection-button')
             ],
-            style={'width': '30%', 'display': 'inline-block', 'vertical-align': 'top'}
+            style={'width': '13%', 'display': 'inline-block', 'vertical-align': 'top', 'margin-left': '15px'}
         ),
 
         html.Div([
             dcc.Graph(
                 id='scatter-plot',
-                style={'width': '100%', 'height': '600px'}
+                style={'width': '100%', 'height': '100vh'}
             )
-        ], style={'width': '40%', 'display': 'inline-block', 'vertical-align': 'top', 'text-align': 'center'}),
+        ], style={'width': '50%', 'display': 'inline-block', 'vertical-align': 'top', 'text-align': 'center'}),
 
         html.Div([
-            html.H2('Right Sidebar'),
-            html.Div([
-                html.H3('Hovered Point'),
-                html.Div(id='hovered-point-output')
-            ]),
-        ], style={'width': '30%', 'display': 'inline-block', 'vertical-align': 'top'}),
+            # html.H2('Right Sidebar'),
+            html.H4('Hover Data'),
+            html.Div(id='hovered-point-output'),
+            html.Br(),
+            html.Div(id='clicked-point-output')
+        ], style={'width': '34%', 'display': 'inline-block', 'vertical-align': 'top', 'margin-left': '15px'}),
 
-        html.Button('Toggle Selection', id='clear-selection-button')
+
     ])
 ])
 
@@ -85,9 +108,10 @@ app.layout = html.Div([
     [Input('tooltip-toggle', 'value'),
      Input('page-input', 'value'),
      Input('scatter-plot', 'clickData'),
-     Input('clear-selection-button', 'n_clicks')]
+     Input('clear-selection-button', 'n_clicks'),
+     Input('similarity-threshold', 'value')]
 )
-def update_scatter_plot(show_text, page_number, click_data, clear_selection_clicks):
+def update_scatter_plot(show_text, page_number, click_data, clear_selection_clicks, similarity_threshold):
     # Creating the hover template based on the checkbox value
     hover_template = 'X: %{x}<br>Y: %{y}<br>Z: %{z}<br>'
 
@@ -154,20 +178,6 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
         zaxis=dict(showspikes=False)
     ))
 
-    show_traces = True
-    # print("clear_selection_clicks", clear_selection_clicks)
-
-    # disable n_clicks
-
-
-    # if clear_selection_clicks is not None:
-    #     print("Buutton clicked", show_traces)
-    #     show_traces = False
-    #     print("Buutton clicked", show_traces)
-    #     clear_selection_clicks = None
-    #     print("clear_selection_clicks 2",clear_selection_clicks)
-
-
     # Get clicked point index
     clicked_index = None
     if click_data is not None:
@@ -181,19 +191,12 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
         # sort similarities by descending order
         most_similar_index = np.argsort(similarities)[::-1]
 
-        n = 2
         # keep only the top n
-        most_similars = most_similar_index[1:n + 1]
-
-        # # Remove the similarity traces if no point is clicked
-        # fig.data = [trace]
+        most_similars = most_similar_index[1:similarity_threshold + 1]
 
         # add most similar points to the plot
-        if n > 0:
+        if similarity_threshold > 0:
             for i in most_similars:
-                # print(filtered_df.iloc[i]['text_id'])
-                # # print similarity score
-                # print(similarities[i])
                 fig.add_trace(
                     go.Scatter3d(
                         x=[filtered_df.iloc[clicked_index]['0'], filtered_df.iloc[i]['0']],
@@ -208,36 +211,16 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
                         name=filtered_df.iloc[i]['text_id'] + ' - ' + str(round(similarities[i], 2)),
                     )
                 )
-
-    else:
-        similarities = np.zeros(len(filtered_df))
+                similar_texts = filtered_df.iloc[most_similars]['text']
+                similarity_scores = similarities[most_similars]
+                print(similar_texts)
+                print(similarity_scores)
 
 
     if clear_selection_clicks is not None:
-        # print TraceInfo
-        # if clear_selection_clicks is odd
         if clear_selection_clicks % 2 == 1:
-            # show only the first fig.data
-            # print(type(fig.data[1]))
-            # print(type(fig.data[0]))
             fig.data = [fig.data[0]]
-            # print(fig.data[0])
 
-        # else:
-        #     fig.data = fig.data
-        #     print(fig.data)
-
-
-    print(show_traces)
-
-
-    # # Update the button state
-    # clear_button_state = {'display': 'none'} if show_similarity else {'display': 'inline'}
-
-
-
-
-    # return fig, clear_button_state
     return fig
 
 
@@ -256,6 +239,8 @@ def update_hovered_point_output(hover_data):
             text_value = point_data['text']
             text_id = df.loc[df['text'] == text_value, 'text_id'].values[0]
             page = df.loc[df['text'] == text_value, 'page'].values[0]
+        else:
+            text_value, text_id, page = None, None, None
     else:
         x, y, z, text_value, text_id, page = None, None, None, None, None, None
 
@@ -272,6 +257,62 @@ def update_hovered_point_output(hover_data):
         ])
     else:
         return html.P("Hover over a point to see its details.")
+
+
+# Callback function to update the right sidebar output
+@app.callback(
+    Output('clicked-point-output', 'children'),
+    [Input('scatter-plot', 'clickData'),
+     Input('similarity-threshold', 'value')]
+)
+# In this function we need to get n number all of most similar texts from and update the clicked point output
+# text_id - text - similarity score
+def update_clicked_point_output(click_data, similarity_threshold):
+    if click_data is not None:
+        clicked_index = click_data['points'][0]['pointNumber']
+        print(df)
+        print(df.iloc[clicked_index])
+        print(df.iloc[clicked_index][['0', '1', '2']])
+
+        # Compute cosine similarity with clicked point
+        similarities = cosine_similarity([df.iloc[clicked_index][['0', '1', '2']]], df[['0', '1', '2']])
+        similarities = similarities.flatten()
+
+        # sort similarities by descending order
+        most_similar_index = np.argsort(similarities)[::-1]
+
+        # keep only the top n
+        most_similars = most_similar_index[1:similarity_threshold + 1]
+
+        # prepare most similar texts and similarity scores
+        similar_texts = df.iloc[most_similars]['text']
+        similarity_scores = similarities[most_similars]
+        print("Similar texts and similarity scores")
+        print(similar_texts)
+        print("Similar texts and similarity scores")
+        print(similarity_scores)
+
+        # prepare output
+        output = []
+        # add title
+        output.append(html.H4("Most similar texts:"))
+        # clicked text
+        output.append(html.P(f"Clicked text: {df.iloc[clicked_index]['text']}"))
+        # show small title for most similar texts
+        output.append(html.P("Most similar texts:"))
+        # add most similar texts and similarity scores
+        for i in range(len(similar_texts)):
+            print(similar_texts.iloc[i])
+            print(similarity_scores[i])
+            output.append(html.P(f"{similar_texts.iloc[i]} - {similarity_scores[i]}"))
+
+        return output
+
+    else:
+        return html.P("Click on a point to see its most similar texts.")
+
+
+
 
 
 # Running the Dash application
