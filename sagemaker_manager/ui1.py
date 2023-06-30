@@ -85,7 +85,11 @@ def display_page(pathname):
         return login_layout
     elif pathname == '/dashboard':
         if not logged_in:
-            return html.Div("You must log in first.")
+            # If user is not logged in, redirect to login page
+            return login_layout
+        elif time.time() > token_expiration:
+            # If the token has expired, redirect to login page
+            return login_layout
         else:
             return dashboard_layout
     else:
@@ -99,6 +103,10 @@ def display_page(pathname):
 
 
 # Callback to authenticate the user
+def getToken(username, password):
+    return "token", time.time() + 3600
+
+
 @app.callback(
     Output('login-message', 'children'),
     [Input('login-button', 'n_clicks')],
@@ -112,27 +120,63 @@ def authenticate_user(n_clicks, username, password):
     # For simplicity, we'll use a dummy validation.
     if username is None or password is None:
         return ""
-    if username == 'admin' and password == 'password':
-        global logged_in
-        logged_in = True
-        return "Login successful! Redirecting to the dashboard..."
-    else:
+    # Call the getToken function with username and password
+    token, expiration = getToken(username, password)
+
+    if token is None or expiration is None:
         return "Invalid credentials. Please try again."
 
+    # Store the token and expiration in session or cookies for later use
+    # For now, we'll use global variables as an example
+    global logged_in
+    global token_expiration
+    logged_in = True
+    token_expiration = expiration
 
-# Callback to redirect to the dashboard after successful login
+    return "Login successful! Redirecting to the dashboard..."
+
+
+# Callback to redirect to the login page after token expiration
 @app.callback(
     Output('url', 'pathname'),
-    [Input('login-message', 'children')]
+    [Input('login-message', 'children')],
+    [State('url', 'pathname')]
 )
-def redirect_to_dashboard(message):
+def redirect_to_login(message, current_pathname):
+    global logged_in
+
     if message == "Login successful! Redirecting to the dashboard...":
         time.sleep(2)  # Delay for demonstration purposes
         return '/dashboard'
+    elif current_pathname == '/dashboard' and logged_in and token_expiration is not None and time.time() > token_expiration:
+        logged_in = False
+        print("Token expired. Redirecting to login page.")
+        return '/'
     else:
+        if logged_in and token_expiration is not None:
+            time_remaining = int(token_expiration - time.time())
+            if time_remaining <= 0:
+                logged_in = False
+                print("Token expired. Redirecting to login page.")
+                return '/'
         raise PreventUpdate
+
+
+# # Callback to redirect to the dashboard after successful login
+# @app.callback(
+#     Output('url', 'pathname'),
+#     [Input('login-message', 'children')]
+# )
+# def redirect_to_dashboard(message):
+#     if message == "Login successful! Redirecting to the dashboard...":
+#         time.sleep(2)  # Delay for demonstration purposes
+#         return '/dashboard'
+#     else:
+#         raise PreventUpdate
 
 
 if __name__ == '__main__':
     logged_in = False
+    token_expiration = None
+    print("Starting server...")
     app.run_server(debug=True)
