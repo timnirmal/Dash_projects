@@ -208,6 +208,7 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
         # add most similar points to the plot
         if similarity_threshold > 0:
             for i in most_similars:
+                color = similarities[i]
                 fig.add_trace(
                     go.Scatter3d(
                         x=[filtered_df.iloc[clicked_index]['0'], filtered_df.iloc[i]['0']],
@@ -216,7 +217,8 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
                         mode='markers',
                         marker=dict(
                             size=point_size,
-                            color='red',
+                            color=color,
+                            colorscale='Oranges',
                             opacity=0.8
                         ),
                         name=filtered_df.iloc[i]['text_id'] + ' - ' + str(round(similarities[i], 2)),
@@ -226,6 +228,22 @@ def update_scatter_plot(show_text, page_number, click_data, clear_selection_clic
                 similarity_scores = similarities[most_similars]
                 print(similar_texts)
                 print(similarity_scores)
+
+            # Create a list to hold the colors for each point
+            colors = ['gray'] * len(filtered_df)
+
+            # Set the color of the selected point to 'Oranges'
+            colors[clicked_index] = 'red'
+
+            # Set the color of the most similar points to 'Oranges'
+            for i in most_similars:
+                colors[i] = 'blue'
+
+            # # Update the color property of the marker object with the colors list
+            # trace.marker.color = colors
+
+            # Update the colorscale property of the marker object
+            trace.marker.colorscale = [[0, 'gray'], [1, 'red']]
 
 
     if clear_selection_clicks is not None:
