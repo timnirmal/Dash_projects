@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc
+from dash import html, dcc, ALL, callback, ctx
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
@@ -219,6 +219,25 @@ def redirect_to_login(message, current_pathname):
                 print("Token expired. Redirecting to login page.")
                 return '/'
         raise PreventUpdate
+
+
+# Callback to update list with last clicked button
+@app.callback(
+    Output('dashboard-content', 'children'),
+    [Input({'type': 'button', 'index': ALL}, 'n_clicks')],
+    [State('dashboard-content', 'children')],
+    prevent_initial_call=True
+)
+def update_output(n_clicks, children):
+    print("Updating dashboard content...")
+    print(f"n_clicks: {n_clicks}")
+    ctx = dash.callback_context
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    button_index = int(button_id.split('-')[-1])
+
+    return f"Button {button_index + 1} clicked!"
+
+
 
 
 if __name__ == '__main__':

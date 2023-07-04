@@ -4,6 +4,7 @@ import dash_bootstrap_components as dbc
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+
 # Define the template component
 def render_template_component(json_data, show_header=False):
     rows = []
@@ -17,18 +18,16 @@ def render_template_component(json_data, show_header=False):
                 html.Td(item['item_name']),
                 html.Td(item['item_status']),
                 html.Td(
-                    dbc.ButtonGroup(
-                        [
-                            dbc.Button(
-                                button['button_name'],
-                                color=button['button_color'],
-                                id={'type': 'button', 'index': button_index},
-                                className='mr-1',
-                                n_clicks=0
-                            )
-                            for button_index, button in enumerate(item['action_button'])
-                        ]
-                    ),
+                    [
+                        dbc.Button(
+                            button['button_name'],
+                            color=button['button_color'],
+                            id={'type': 'button', 'index': button_index},
+                            className='mr-1',
+                            n_clicks=0
+                        )
+                        for button_index, button in enumerate(item['action_button'])
+                    ],
                     className='d-flex justify-content-center'
                 )
             ]
@@ -85,3 +84,11 @@ def render_template_component(json_data, show_header=False):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
+
+#                                 id={'type': 'button', 'index': button_index, 'id': item['item_name'],
+#                                     'name': button['button_name']},
+
+# button_group = row.children[3].children
+# for button in button_group:
+#     print(button)
+#     print()
